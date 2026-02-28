@@ -3,7 +3,9 @@
 //! See [`PhysicsTransformPlugin`].
 
 mod transform;
-pub use transform::{Position, PreSolveDeltaPosition, PreSolveDeltaRotation, Rotation};
+pub use transform::{
+    BevyTransformAuthority, Position, PreSolveDeltaPosition, PreSolveDeltaRotation, Rotation,
+};
 #[allow(unused_imports)]
 pub(crate) use transform::{RotationValue, init_physics_transform};
 
@@ -316,7 +318,10 @@ pub fn position_to_transform(
 /// based on their own and their parent's [`Position`] and [`Rotation`].
 #[cfg(feature = "3d")]
 pub fn position_to_transform(
-    mut query: Query<PosToTransformComponents, PosToTransformFilter>,
+    mut query: Query<
+        PosToTransformComponents,
+        (PosToTransformFilter, Without<BevyTransformAuthority>),
+    >,
     parents: Query<ParentComponents, With<Children>>,
 ) {
     for (mut transform, pos, rot, parent) in &mut query {

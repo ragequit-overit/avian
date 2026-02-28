@@ -549,7 +549,10 @@ pub mod prelude {
         collision::prelude::*,
         dynamics::{self, ccd::SpeculativeMargin, prelude::*},
         interpolation::*,
-        physics_transform::{PhysicsTransformHelper, PhysicsTransformPlugin, Position, Rotation},
+        physics_transform::{
+            BevyTransformAuthority, PhysicsTransformHelper, PhysicsTransformPlugin, Position,
+            Rotation,
+        },
         schedule::{
             Physics, PhysicsSchedule, PhysicsSchedulePlugin, PhysicsSet, PhysicsStepSet,
             PhysicsStepSystems, PhysicsSystems, PhysicsTime, Substeps,

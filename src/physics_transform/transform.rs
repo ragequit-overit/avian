@@ -13,6 +13,9 @@ use derive_more::From;
 #[cfg(feature = "2d")]
 use crate::math::Matrix;
 
+#[derive(Component)]
+pub struct BevyTransformAuthority;
+
 /// The global position of a [rigid body](RigidBody) or a [collider](Collider).
 ///
 /// # Relation to `Transform` and `GlobalTransform`
