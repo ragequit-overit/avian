@@ -430,6 +430,18 @@ pub enum ColliderConstructor {
         voxel_size: Vector,
         grid_coordinates: Vec<IVector>,
     },
+    /// Constructs a collider as a compound of cuboids by greedily merging adjacent voxel cells.
+    ///
+    /// This is intended for **dynamic** voxel rigid bodies (e.g. chunked voxel structures) where triangle meshes
+    /// are unstable, and VHACD convex decomposition may be too imprecise.
+    ///
+    /// The voxel grid is defined in the collider's local space: each voxel occupies
+    /// `[c * voxel_size, (c + 1) * voxel_size]` for its integer grid coordinate `c`.
+    #[cfg(feature = "3d")]
+    GreedyCuboidsFromVoxels {
+        voxel_size: Vector,
+        grid_coordinates: Vec<IVector>,
+    },
     /// Constructs a collider with [`Collider::voxelized_polyline`].
     #[cfg(feature = "2d")]
     VoxelizedPolyline {

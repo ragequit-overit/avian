@@ -14,6 +14,8 @@ use super::EnlargedAabb;
 use crate::{make_pose, prelude::*};
 #[cfg(feature = "collider-from-mesh")]
 use bevy::mesh::{Indices, VertexAttributeValues};
+#[cfg(feature = "3d")]
+use bevy::platform::collections::HashSet;
 use bevy::{log, prelude::*};
 use contact_query::UnsupportedShape;
 use itertools::Either;
@@ -1026,6 +1028,32 @@ impl Collider {
         SharedShape::voxels_from_points(voxel_size, points).into()
     }
 
+    /// Creates a compound collider made of merged cuboids from voxel occupancy.
+    ///
+    /// Returns `None` if no voxels are provided. See `greedy_compound_cuboids_from_voxels` for
+    /// the greedy merging algorithm.
+    #[cfg(feature = "3d")]
+    pub fn greedy_compound_cuboids_from_voxels(
+        voxel_size: Vector,
+        points: &[Vector],
+    ) -> Option<Self> {
+        if points.is_empty() {
+            return None;
+        }
+
+        // Convert points to integer grid coordinates using floor(point / voxel_size)
+        let mut grid_coords: Vec<IVector> = Vec::with_capacity(points.len());
+        for p in points.iter() {
+            let gx = (p.x / voxel_size.x).floor() as i32;
+            let gy = (p.y / voxel_size.y).floor() as i32;
+            let gz = (p.z / voxel_size.z).floor() as i32;
+            grid_coords.push(IVector::new(gx, gy, gz));
+        }
+
+        let shapes = greedy_compound_cuboids_from_voxel_grid(voxel_size, &grid_coords);
+        (!shapes.is_empty()).then(|| Self::compound(shapes))
+    }
+
     /// Creates a voxel collider obtained from the decomposition of the given polyline into voxelized convex parts.
     #[cfg(feature = "2d")]
     pub fn voxelized_polyline(
@@ -1425,6 +1453,14 @@ impl Collider {
                 voxel_size,
                 grid_coordinates,
             } => Some(Self::voxels(voxel_size, &grid_coordinates)),
+            #[cfg(feature = "3d")]
+            ColliderConstructor::GreedyCuboidsFromVoxels {
+                voxel_size,
+                grid_coordinates,
+            } => {
+                let shapes = greedy_compound_cuboids_from_voxel_grid(voxel_size, &grid_coordinates);
+                (!shapes.is_empty()).then(|| Self::compound(shapes))
+            }
             #[cfg(feature = "2d")]
             ColliderConstructor::VoxelizedPolyline {
                 vertices,
@@ -1490,6 +1526,128 @@ impl Collider {
             }
         }
     }
+}
+
+#[cfg(feature = "3d")]
+fn greedy_compound_cuboids_from_voxel_grid(
+    voxel_size: Vector,
+    grid_coordinates: &[IVector],
+) -> Vec<(Position, Rotation, Collider)> {
+    if grid_coordinates.is_empty() {
+        return vec![];
+    }
+
+    // Deduplicate to keep bounds and occupancy consistent.
+    let unique: HashSet<IVector> = grid_coordinates.iter().copied().collect();
+    if unique.is_empty() {
+        return vec![];
+    }
+
+    let mut min = IVector::new(i32::MAX, i32::MAX, i32::MAX);
+    let mut max = IVector::new(i32::MIN, i32::MIN, i32::MIN);
+    for c in unique.iter() {
+        min.x = min.x.min(c.x);
+        min.y = min.y.min(c.y);
+        min.z = min.z.min(c.z);
+        max.x = max.x.max(c.x);
+        max.y = max.y.max(c.y);
+        max.z = max.z.max(c.z);
+    }
+
+    let size_x = (max.x - min.x + 1) as usize;
+    let size_y = (max.y - min.y + 1) as usize;
+    let size_z = (max.z - min.z + 1) as usize;
+
+    let to_index = |x: i32, y: i32, z: i32| -> usize {
+        let ox = (x - min.x) as usize;
+        let oy = (y - min.y) as usize;
+        let oz = (z - min.z) as usize;
+        ox + size_x * (oy + size_y * oz)
+    };
+
+    let mut occupied = vec![false; size_x * size_y * size_z];
+    for c in unique.iter() {
+        occupied[to_index(c.x, c.y, c.z)] = true;
+    }
+    let mut visited = vec![false; size_x * size_y * size_z];
+
+    let mut shapes = vec![];
+
+    for z in min.z..=max.z {
+        for y in min.y..=max.y {
+            for x in min.x..=max.x {
+                let start_idx = to_index(x, y, z);
+                if !occupied[start_idx] || visited[start_idx] {
+                    continue;
+                }
+
+                // Greedily expand a box in +X, then +Y, then +Z.
+                let mut dx = 1i32;
+                while x + dx <= max.x {
+                    let idx = to_index(x + dx, y, z);
+                    if !occupied[idx] || visited[idx] {
+                        break;
+                    }
+                    dx += 1;
+                }
+
+                let mut dy = 1i32;
+                'expand_y: while y + dy <= max.y {
+                    for xx in x..(x + dx) {
+                        let idx = to_index(xx, y + dy, z);
+                        if !occupied[idx] || visited[idx] {
+                            break 'expand_y;
+                        }
+                    }
+                    dy += 1;
+                }
+
+                let mut dz = 1i32;
+                'expand_z: while z + dz <= max.z {
+                    for yy in y..(y + dy) {
+                        for xx in x..(x + dx) {
+                            let idx = to_index(xx, yy, z + dz);
+                            if !occupied[idx] || visited[idx] {
+                                break 'expand_z;
+                            }
+                        }
+                    }
+                    dz += 1;
+                }
+
+                for zz in z..(z + dz) {
+                    for yy in y..(y + dy) {
+                        for xx in x..(x + dx) {
+                            visited[to_index(xx, yy, zz)] = true;
+                        }
+                    }
+                }
+
+                let dx_s = dx as Scalar;
+                let dy_s = dy as Scalar;
+                let dz_s = dz as Scalar;
+
+                let center = Vector::new(
+                    (x as Scalar + dx_s * 0.5) * voxel_size.x,
+                    (y as Scalar + dy_s * 0.5) * voxel_size.y,
+                    (z as Scalar + dz_s * 0.5) * voxel_size.z,
+                );
+                let lengths = Vector::new(
+                    dx_s * voxel_size.x,
+                    dy_s * voxel_size.y,
+                    dz_s * voxel_size.z,
+                );
+
+                shapes.push((
+                    Position(center),
+                    Rotation::IDENTITY,
+                    Collider::cuboid(lengths.x, lengths.y, lengths.z),
+                ));
+            }
+        }
+    }
+
+    shapes
 }
 
 #[cfg(feature = "collider-from-mesh")]
@@ -1826,5 +1984,48 @@ mod tests {
             expected_sibling_world_pos.z,
             epsilon = 1e-6
         );
+    }
+
+    #[test]
+    fn greedy_cuboids_from_voxels_merges_full_block() {
+        let voxel_size = Vector::splat(1.0);
+        let mut coords = Vec::new();
+        for z in 0..2 {
+            for y in 0..2 {
+                for x in 0..2 {
+                    coords.push(IVector::new(x, y, z));
+                }
+            }
+        }
+
+        let constructor = ColliderConstructor::GreedyCuboidsFromVoxels {
+            voxel_size,
+            grid_coordinates: coords,
+        };
+
+        #[cfg(feature = "collider-from-mesh")]
+        let collider = Collider::try_from_constructor(constructor, None).unwrap();
+        #[cfg(not(feature = "collider-from-mesh"))]
+        let collider = Collider::try_from_constructor(constructor).unwrap();
+
+        match collider.shape().as_typed_shape() {
+            TypedShape::Compound(c) => {
+                assert_eq!(c.shapes().len(), 1);
+                let (pose, shape) = &c.shapes()[0];
+                assert_relative_eq!(pose.translation.x, 1.0, epsilon = 1e-6);
+                assert_relative_eq!(pose.translation.y, 1.0, epsilon = 1e-6);
+                assert_relative_eq!(pose.translation.z, 1.0, epsilon = 1e-6);
+
+                match shape.as_typed_shape() {
+                    TypedShape::Cuboid(cuboid) => {
+                        assert_relative_eq!(cuboid.half_extents.x, 1.0, epsilon = 1e-6);
+                        assert_relative_eq!(cuboid.half_extents.y, 1.0, epsilon = 1e-6);
+                        assert_relative_eq!(cuboid.half_extents.z, 1.0, epsilon = 1e-6);
+                    }
+                    other => panic!("expected cuboid, got {other:?}"),
+                }
+            }
+            other => panic!("expected compound, got {other:?}"),
+        }
     }
 }
