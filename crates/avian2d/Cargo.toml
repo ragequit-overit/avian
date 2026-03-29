@@ -1,6 +1,6 @@
 [package]
 name = "avian2d"
-version = "0.6.0-dev"
+version = "0.7.0-dev"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["Joona Aalto <jondolf.dev@gmail.com>"]
@@ -90,7 +90,6 @@ approx = "0.5"
 parry2d = { version = "0.26", optional = true }
 parry2d-f64 = { version = "0.26", optional = true }
 obvhs = { version = "0.3" }
-obvhs_glam = { package = "glam", version = "0.31" }
 serde = { version = "1", features = ["derive"], optional = true }
 derive_more = "2"
 thiserror = "2"
@@ -172,6 +171,10 @@ required-features = ["2d", "default-collider"]
 [[example]]
 name = "one_way_platform_2d"
 required-features = ["2d", "default-collider"]
+
+[[example]]
+name = "picking_2d_in_perspective"
+required-features = ["2d", "debug-plugin", "bevy_picking"]
 
 [[example]]
 name = "prismatic_joint_2d"

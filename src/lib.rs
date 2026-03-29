@@ -21,11 +21,11 @@
 //! ```toml
 //! # For 2D applications:
 //! [dependencies]
-//! avian2d = "0.5"
+//! avian2d = "0.6"
 //!
 //! # For 3D applications:
 //! [dependencies]
-//! avian3d = "0.5"
+//! avian3d = "0.6"
 //!
 //! # If you want to use the most up-to-date version, you can follow the main branch:
 //! [dependencies]
@@ -39,7 +39,7 @@
 //! [dependencies]
 //! # Add 3D Avian with double-precision floating point numbers.
 //! # `parry-f64` enables collision detection using Parry.
-//! avian3d = { version = "0.5", default-features = false, features = ["3d", "f64", "parry-f64", "xpbd_joints"] }
+//! avian3d = { version = "0.6", default-features = false, features = ["3d", "f64", "parry-f64", "xpbd_joints"] }
 //! ```
 //!
 //! ## Feature Flags
@@ -373,8 +373,8 @@
 //! system parameter with utilities for implementing your own kinematic character controllers.
 //! See its documentation for more information.
 //!
-//! There are also some third party character controllers such as [`bevy_tnua`](https://github.com/idanarye/bevy-tnua)
-//! that support Avian.
+//! There are also some third party character controllers such as [`bevy_ahoy`](https://github.com/janhohenheim/bevy_ahoy)
+//! (kinematic) and [`bevy_tnua`](https://github.com/idanarye/bevy-tnua) (dynamic) that work with Avian.
 //!
 //! For custom character controllers, you can take a look at the
 #![cfg_attr(

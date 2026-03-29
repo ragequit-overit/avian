@@ -42,8 +42,6 @@ pub struct ColliderTreeProxy {
     pub collider: Entity,
     /// The body this collider is attached to.
     pub body: Option<Entity>,
-    /// The tight AABB of the collider.
-    pub aabb: Aabb,
     /// The collision layers of the collider.
     pub layers: CollisionLayers,
     /// Flags for the proxy.
@@ -135,8 +133,6 @@ pub struct ColliderTreeWorkspace {
     pub reinsertion_optimizer: ReinsertionOptimizer,
     /// A stack for tracking insertion candidates during proxy insertions.
     pub insertion_stack: HeapStack<SiblingInsertionCandidate>,
-    /// A temporary BVH used during partial rebuilds.
-    pub temp_bvh: Bvh2,
     /// Temporary flagged nodes for partial rebuilds.
     pub temp_flags: Vec<bool>,
 }
@@ -147,7 +143,6 @@ impl Clone for ColliderTreeWorkspace {
             ploc_builder: self.ploc_builder.clone(),
             reinsertion_optimizer: ReinsertionOptimizer::default(),
             insertion_stack: self.insertion_stack.clone(),
-            temp_bvh: Bvh2::default(),
             temp_flags: Vec::new(),
         }
     }
@@ -159,7 +154,6 @@ impl Default for ColliderTreeWorkspace {
             ploc_builder: PlocBuilder::default(),
             reinsertion_optimizer: ReinsertionOptimizer::default(),
             insertion_stack: HeapStack::new_with_capacity(2000),
-            temp_bvh: Bvh2::default(),
             temp_flags: Vec::new(),
         }
     }
@@ -240,6 +234,28 @@ impl ColliderTree {
         unsafe { self.proxies.get_unchecked_mut(proxy_id.index()) }
     }
 
+    /// Gets the AABB of a proxy in the tree.
+    ///
+    /// Returns `None` if the proxy ID is invalid.
+    #[inline]
+    pub fn get_proxy_aabb(&self, proxy_id: ProxyId) -> Option<Aabb> {
+        let node_id = self.bvh.primitives_to_nodes.get(proxy_id.index())?;
+        self.bvh.nodes.get(*node_id as usize).map(|node| node.aabb)
+    }
+
+    /// Gets the AABB of a proxy in the tree without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the `proxy_id` is valid.
+    #[inline]
+    pub unsafe fn get_proxy_aabb_unchecked(&self, proxy_id: ProxyId) -> Aabb {
+        unsafe {
+            let node_id = *self.bvh.primitives_to_nodes.get_unchecked(proxy_id.index()) as usize;
+            self.bvh.nodes.get_unchecked(node_id).aabb
+        }
+    }
+
     /// Updates the AABB of a proxy in the tree.
     ///
     /// If the BVH should be refitted at the same time, consider using
@@ -272,9 +288,6 @@ impl ColliderTree {
     /// Updates the AABB of a proxy and reinserts it at an optimal place in the tree.
     #[inline]
     pub fn reinsert_proxy(&mut self, proxy_id: ProxyId, aabb: Aabb) {
-        // Update the proxy's AABB.
-        self.proxies[proxy_id.index()].aabb = aabb;
-
         // Reinsert the node into the BVH.
         let node_id = self.bvh.primitives_to_nodes[proxy_id.index()];
         self.bvh.resize_node(node_id as usize, aabb);
