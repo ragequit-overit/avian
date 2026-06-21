@@ -191,11 +191,11 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
         );
 
         // Cases 4
-        // Note: We use `Replace` here to run before Case 2.
+        // Note: We use `Discard` here to run before Case 2.
         app.add_observer(
-            add_to_tree_on::<Replace, Disabled, (Without<ColliderDisabled>, Allow<Disabled>)>,
+            add_to_tree_on::<Discard, Disabled, (Without<ColliderDisabled>, Allow<Disabled>)>,
         );
-        app.add_observer(add_to_tree_on::<Replace, ColliderDisabled, ()>);
+        app.add_observer(add_to_tree_on::<Discard, ColliderDisabled, ()>);
 
         // Case 5
         app.add_observer(
@@ -371,7 +371,7 @@ impl<C: AnyCollider> Plugin for ColliderTreeUpdatePlugin<C> {
 
         // Case 11
         app.add_observer(
-            |trigger: On<Replace, RigidBodyDisabled>,
+            |trigger: On<Discard, RigidBodyDisabled>,
              body_query: Query<(&RigidBodyColliders, Has<RigidBodyDisabled>)>,
              mut collider_query: Query<&ColliderTreeProxyKey, Without<ColliderDisabled>>,
              mut trees: ResMut<ColliderTrees>| {
@@ -509,7 +509,7 @@ struct LastDynamicKinematicAabbUpdate(Tick);
 /// previous [`EnlargedAabb`], or whose collider has been added to a [`ColliderTree`].
 ///
 /// [`ColliderTree`]: crate::collider_tree::ColliderTree
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone)]
 pub struct MovedProxies {
     /// A vector of moved proxy keys.
     proxies: Vec<ColliderTreeProxyKey>,

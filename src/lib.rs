@@ -21,11 +21,11 @@
 //! ```toml
 //! # For 2D applications:
 //! [dependencies]
-//! avian2d = "0.6"
+//! avian2d = "0.7"
 //!
 //! # For 3D applications:
 //! [dependencies]
-//! avian3d = "0.6"
+//! avian3d = "0.7"
 //!
 //! # If you want to use the most up-to-date version, you can follow the main branch:
 //! [dependencies]
@@ -39,7 +39,7 @@
 //! [dependencies]
 //! # Add 3D Avian with double-precision floating point numbers.
 //! # `parry-f64` enables collision detection using Parry.
-//! avian3d = { version = "0.6", default-features = false, features = ["3d", "f64", "parry-f64", "xpbd_joints"] }
+//! avian3d = { version = "0.7", default-features = false, features = ["3d", "f64", "parry-f64", "xpbd_joints"] }
 //! ```
 //!
 //! ## Feature Flags
@@ -210,6 +210,7 @@
 //!     - [`PhysicsSchedule`] and [`PhysicsStepSystems`]
 //!     - [`SubstepSchedule`]
 //!     - [`SolverSystems`] and [`SubstepSolverSystems`](dynamics::solver::schedule::SubstepSolverSystems)
+//!     - [`SpatialQuerySystems`]
 //!     - Many more internal system sets
 //! - [Configure the schedule used for running physics](PhysicsPlugins#custom-schedule)
 //! - [Pausing, resuming and stepping physics](Physics#pausing-resuming-and-stepping-physics)
@@ -784,7 +785,7 @@ impl PluginGroup for PhysicsPlugins {
             .add(BroadPhaseCorePlugin)
             .add(BvhBroadPhasePlugin::<()>::default())
             .add(JointPlugin)
-            .add(SpatialQueryPlugin)
+            .add(SpatialQueryPlugin::new(self.schedule))
             .add(PhysicsTransformPlugin::new(self.schedule))
             .add(PhysicsInterpolationPlugin::default())
     }
